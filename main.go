@@ -22,7 +22,7 @@ var s *discordgo.Session
 
 var (
 	minCalorieIntake = 1.0
-	consumedMinValue = 1.0
+	maxItemCalories  = 5000.0
 
 	commands = []*discordgo.ApplicationCommand{
 		{
@@ -35,15 +35,11 @@ var (
 					Description: "The amount of calories you need to intake daily",
 					Required:    true,
 					MinValue:    &minCalorieIntake,
-					MaxValue:    5000,
+					MaxValue:    maxItemCalories,
 				},
 			},
 		},
 		/*{
-			Name:        "remaining",
-			Description: "Gives your remaining calories for the day",
-		},
-		{
 			Name:        "average",
 			Description: "Gives you an average of your calories consumed over the provided days",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -56,6 +52,10 @@ var (
 				},
 			},
 		}, */
+		{
+			Name:        "rem",
+			Description: "Gives your remaining calories for the day",
+		},
 		{
 			Name:        "update",
 			Description: "Update a log entry",
@@ -77,6 +77,8 @@ var (
 					Name:        "calories",
 					Description: "Calories consumed by eating this product",
 					Required:    true,
+					MinValue:    &minCalorieIntake,
+					MaxValue:    maxItemCalories,
 				},
 			},
 		},
@@ -85,7 +87,7 @@ var (
 			Description: "List the days log entries",
 		},
 		{
-			Name:        "delete",
+			Name:        "del",
 			Description: "Delete a log entry",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
@@ -112,6 +114,8 @@ var (
 					Name:        "calories",
 					Description: "The amount of calories consumed by eating this product",
 					Required:    true,
+					MinValue:    &minCalorieIntake,
+					MaxValue:    maxItemCalories,
 				},
 			},
 		},
@@ -130,6 +134,8 @@ var (
 					Name:        "calories",
 					Description: "The amount of calories for the grams specified",
 					Required:    true,
+					MinValue:    &minCalorieIntake,
+					MaxValue:    maxItemCalories,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionNumber,
@@ -180,6 +186,7 @@ var (
 		"add": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			var response string
 			userId := i.Member.User.ID
+			userDisplayName := i.Member.User.Username
 
 			user, err := userById(userId)
 			if err != nil {
@@ -210,7 +217,14 @@ var (
 				if err != nil {
 					response = "There was an error, please try again..."
 				} else {
-					response = fmt.Sprintf("Successfully added %v to your daily log.", foodItem)
+					response = fmt.Sprintf("Successfully added %v to your daily log for %d calories.", foodItem, calories)
+				}
+
+				remaining, err := fetchRemainingCalories(userId)
+				if err != nil {
+					log.Printf("Encountered error when retrieving remaining calories for user %v.", userDisplayName)
+				} else {
+					response = response + fmt.Sprintf("\nYou have %d calories remaining today.", remaining)
 				}
 			}
 
@@ -262,7 +276,7 @@ var (
 				},
 			})
 		},
-		"delete": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		"del": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			userId := i.Member.User.ID
 
 			// Access options in the order provided by the user.
@@ -334,11 +348,35 @@ var (
 				response = "There was an error, please try again..."
 			} else if len(foodLogs) == 0 {
 				log.Printf("User %v currently has no logs.", userDisplayName)
-				response = "You currently have no logs, use /add to add some."
+				response = "Set your daily calories first using the /set command."
 			} else {
 				for _, foodLog := range foodLogs {
 					response = response + fmt.Sprintf("%v %v %v %v\n", foodLog.id, foodLog.food_item, foodLog.calories, foodLog.date_time.Format("02/01/2006 15:04"))
 				}
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
+				},
+			})
+		},
+		"rem": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			userId := i.Member.User.ID
+			userDisplayName := i.Member.User.Username
+
+			var response string
+
+			log.Printf("Fetching remaining calories for user %v.", userDisplayName)
+			remaining, err := fetchRemainingCalories(userId)
+			if err != nil {
+				log.Printf("Encountered error when retrieving remaining calories for user %v.", userDisplayName)
+			} else if remaining == 10000 {
+				log.Printf("Couldn't get the remaining calories for user %v.", userDisplayName)
+				response = "Couldn't work out your remaining calories, make sure you've used /set to set your daily calories."
+			} else {
+				response = fmt.Sprintf("You have %d calories remaining today.", remaining)
 			}
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

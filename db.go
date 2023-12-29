@@ -148,3 +148,29 @@ func fetchDailyFoodLogs(userId string) ([]FoodLog, error) {
 	}
 	return foodLogs, err
 }
+
+func fetchRemainingCalories(userId string) (int64, error) {
+	row := db.QueryRowContext(
+		context.Background(),
+		`SELECT user.daily_calories - COALESCE(SUM(food_log.calories), 0) AS remaining_calories
+		FROM user
+		LEFT JOIN food_log ON user.id = food_log.user_id AND DATE(food_log.date_time) = CURRENT_DATE
+		WHERE user.id=?
+		GROUP BY user.id, user.daily_calories;`,
+		userId,
+	)
+
+	var remainingCalories int64
+
+	err := row.Scan(&remainingCalories)
+
+	if err != nil && err == sql.ErrNoRows {
+		return 10000, err
+	}
+
+	if err != nil {
+		return remainingCalories, err
+	}
+
+	return remainingCalories, nil
+}
