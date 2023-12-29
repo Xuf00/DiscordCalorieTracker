@@ -13,7 +13,7 @@ e.g /add Mince Pie 200
 ```
 
 ```
-/modify [log_id] [label] [calories]
+/update [log_id] [label] [calories]
 e.g /update 1 Mince Pie with Cream 250
 ID can be retrieved from the today command
 ```
@@ -42,5 +42,5 @@ Gives you an average of calories consumed over the provided days, max of 7 days
 ```
 
 ```
-/conv [calories] [grams] [weight] [consumed]
+/conv [calories] [grams] [weight]
 ```

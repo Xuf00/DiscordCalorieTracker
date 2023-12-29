@@ -20,73 +20,26 @@ var (
 
 var s *discordgo.Session
 
-func init() { flag.Parse() }
-
-func init() {
-	var err error
-	s, err = discordgo.New("Bot " + *BotToken)
-	if err != nil {
-		log.Fatalf("Invalid bot parameters: %v", err)
-	}
-}
-
 var (
+	minCalorieIntake = 1.0
 	consumedMinValue = 1.0
 
 	commands = []*discordgo.ApplicationCommand{
-		/* {
+		{
 			Name:        "set",
 			Description: "Set your daily calorie intake",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
+					Type:        discordgo.ApplicationCommandOptionInteger,
 					Name:        "calories",
 					Description: "The amount of calories you need to intake daily",
 					Required:    true,
+					MinValue:    &minCalorieIntake,
+					MaxValue:    5000,
 				},
 			},
 		},
-		{
-			Name:        "update",
-			Description: "Update a log entry",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "logid",
-					Description: "The ID of the log entry",
-					Required:    true,
-				},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "label",
-					Description: "The name of the food product",
-					Required:    true,
-				},
-				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "calories",
-					Description: "Calories consumed by eating this product",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "delete",
-			Description: "Delete a log entry",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "label",
-					Description: "The ID of the log entry",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "list",
-			Description: "List the days log entries",
-		},
-		{
+		/*{
 			Name:        "remaining",
 			Description: "Gives your remaining calories for the day",
 		},
@@ -102,6 +55,46 @@ var (
 					Required:    true,
 				},
 			},
+		}, */
+		{
+			Name:        "update",
+			Description: "Update a log entry",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "logid",
+					Description: "The ID of the log entry",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "fooditem",
+					Description: "The name of the food product",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "calories",
+					Description: "Calories consumed by eating this product",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "list",
+			Description: "List the days log entries",
+		},
+		{
+			Name:        "delete",
+			Description: "Delete a log entry",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "logid",
+					Description: "The ID of the log entry",
+					Required:    true,
+				},
+			},
 		},
 		{
 			Name:        "add",
@@ -109,18 +102,19 @@ var (
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "label",
+					Name:        "fooditem",
 					Description: "The name of the food product",
 					Required:    true,
+					MaxLength:   50,
 				},
 				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
+					Type:        discordgo.ApplicationCommandOptionInteger,
 					Name:        "calories",
 					Description: "The amount of calories consumed by eating this product",
 					Required:    true,
 				},
 			},
-		}, */
+		},
 		{
 			Name:        "conv",
 			Description: "Figure out actual calories consumed when only given per X grams",
@@ -143,31 +137,161 @@ var (
 					Description: "The actual weight in grams of the packet",
 					Required:    true,
 				},
-				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "consumed",
-					Description: "The amount consumed",
-					Required:    false,
-					MinValue:    &consumedMinValue,
-				},
 			},
 		},
 	}
 
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"set": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			// Access options in the order provided by the user.
+			options := i.ApplicationCommandData().Options
+
+			// Convert the slice into a map
+			optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+			for _, opt := range options {
+				optionMap[opt.Name] = opt
+			}
+
+			calories := optionMap["calories"].IntValue()
+			userId := i.Member.User.ID
+
+			user := User{
+				id:             userId,
+				daily_calories: int16(calories),
+			}
+
+			var response string
+
+			_, err := setUserCalories(&user)
+
+			if err != nil {
+				response = "There was an error, please try again..."
+			} else {
+				response = fmt.Sprintf("Your daily calorie intake has successfully been set to %d.", calories)
+			}
+
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "You requested to set your daily calories.",
+					Content: response,
+				},
+			})
+		},
+		"add": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			var response string
+			userId := i.Member.User.ID
+
+			user, err := userById(userId)
+			if err != nil {
+				response = fmt.Sprintf("Encountered an error: %v", err)
+			} else if (User{}) == user {
+				response = "Set your daily calories first using the /set command."
+			} else {
+				// Access options in the order provided by the user.
+				options := i.ApplicationCommandData().Options
+
+				// Convert the slice into a map
+				optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+				for _, opt := range options {
+					optionMap[opt.Name] = opt
+				}
+
+				foodItem := optionMap["fooditem"].StringValue()
+				calories := optionMap["calories"].IntValue()
+
+				foodLog := FoodLog{
+					user_id:   userId,
+					food_item: foodItem,
+					calories:  int16(calories),
+				}
+
+				_, err := addUserFoodLog(&foodLog)
+
+				if err != nil {
+					response = "There was an error, please try again..."
+				} else {
+					response = fmt.Sprintf("Successfully added %v to your daily log.", foodItem)
+				}
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
 				},
 			})
 		},
 		"update": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			userId := i.Member.User.ID
+
+			// Access options in the order provided by the user.
+			options := i.ApplicationCommandData().Options
+
+			// Convert the slice into a map
+			optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+			for _, opt := range options {
+				optionMap[opt.Name] = opt
+			}
+
+			logId := optionMap["logid"].IntValue()
+			foodItem := optionMap["fooditem"].StringValue()
+			calories := optionMap["calories"].IntValue()
+
+			foodLog := FoodLog{
+				id:        logId,
+				user_id:   userId,
+				food_item: foodItem,
+				calories:  int16(calories),
+			}
+
+			var response string
+
+			n, err := updateUserFoodLog(&foodLog)
+			if err != nil {
+				response = "There was an error, please try again..."
+			} else if n == 0 {
+				response = fmt.Sprintf("Could not find a food log with ID %v.", logId)
+			} else {
+				response = fmt.Sprintf("Successfully updated food log with ID %v.", logId)
+			}
+
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "You requested to update your daily calories.",
+					Content: response,
+				},
+			})
+		},
+		"delete": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			userId := i.Member.User.ID
+
+			// Access options in the order provided by the user.
+			options := i.ApplicationCommandData().Options
+
+			// Convert the slice into a map
+			optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+			for _, opt := range options {
+				optionMap[opt.Name] = opt
+			}
+
+			logId := optionMap["logid"].IntValue()
+
+			n, err := deleteUserFoodLog(userId, logId)
+
+			var response string
+
+			if err != nil {
+				response = "There was an error, please try again..."
+			} else if n == 0 {
+				response = fmt.Sprintf("Could not find a food log with ID %v.", logId)
+			} else {
+				response = "Successfully deleted the item from your daily log."
+			}
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
 				},
 			})
 		},
@@ -181,26 +305,40 @@ var (
 				optionMap[opt.Name] = opt
 			}
 
-			getValue := func(key string) float64 {
-				if opt, ok := optionMap[key]; ok {
-					return opt.FloatValue()
-				}
-				return 0
-			}
-
-			calories := getValue("calories")
-			grams := getValue("grams")
-			weight := getValue("weight")
-			consumed := getValue("consumed")
+			calories := optionMap["calories"].FloatValue()
+			grams := optionMap["grams"].FloatValue()
+			weight := optionMap["weight"].FloatValue()
 
 			perGram := calories / grams
 			totalCalories := perGram * weight
 
 			response := fmt.Sprintf("%.2f calories per gram \nTotal amount of calories is %.0f", perGram, math.Ceil(totalCalories))
 
-			if consumed != 0 {
-				consumedCalories := perGram * consumed
-				response += fmt.Sprintf("\nConsumed %.0f which is %.0f calories", consumed, math.Ceil(consumedCalories))
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
+				},
+			})
+		},
+		"list": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			userId := i.Member.User.ID
+			userDisplayName := i.Member.User.Username
+
+			var response string
+
+			log.Printf("Fetching daily food logs for user %v.", userDisplayName)
+			foodLogs, err := fetchDailyFoodLogs(userId)
+			if err != nil {
+				log.Printf("Encountered error when listing food logs for user %v.", userDisplayName)
+				response = "There was an error, please try again..."
+			} else if len(foodLogs) == 0 {
+				log.Printf("User %v currently has no logs.", userDisplayName)
+				response = "You currently have no logs, use /add to add some."
+			} else {
+				for _, foodLog := range foodLogs {
+					response = response + fmt.Sprintf("%v %v %v %v\n", foodLog.id, foodLog.food_item, foodLog.calories, foodLog.date_time.Format("02/01/2006 15:04"))
+				}
 			}
 
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -213,18 +351,13 @@ var (
 	}
 )
 
-func init() {
-	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i)
-		}
-	})
-}
-
 func main() {
-	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
-	})
+	flag.Parse()
+
+	initDb()
+
+	initDiscordSession()
+
 	err := s.Open()
 	if err != nil {
 		log.Fatalf("Cannot open the session: %v", err)
@@ -258,4 +391,24 @@ func main() {
 	}
 
 	log.Println("Gracefully shutting down.")
+}
+
+func initDiscordSession() {
+	var err error
+	s, err = discordgo.New("Bot " + *BotToken)
+	if err != nil {
+		log.Fatalf("Invalid bot parameters: %v", err)
+	}
+	s.AddHandler(onReady)
+	s.AddHandler(handleCommands)
+}
+
+func onReady(s *discordgo.Session, r *discordgo.Ready) {
+	log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
+}
+
+func handleCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+		h(s, i)
+	}
 }
