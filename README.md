@@ -19,7 +19,7 @@ ID can be retrieved from the today command
 ```
 
 ```
-/delete [log_id]
+/del [log_id]
 ID can be retrieved from the today command
 ```
 
@@ -32,7 +32,7 @@ Gives a list of current days calorie intake like this:
 ```
 
 ```
-/remaining
+/rem
 Gives your remaining calories for the day
 ```
 

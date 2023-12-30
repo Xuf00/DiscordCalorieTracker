@@ -3,7 +3,7 @@ module github.com/discordcalorietracker
 go 1.20
 
 require (
-	github.com/bwmarrin/discordgo v0.27.1 // indirect
+	github.com/bwmarrin/discordgo v0.27.2-0.20230704233747-e39e715086d2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
