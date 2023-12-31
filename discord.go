@@ -12,6 +12,8 @@ var (
 	minCalorieIntake = 1.0
 	maxItemCalories  = 5000.0
 
+	minAverageDays = 2.0
+
 	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:        "set",
@@ -27,19 +29,20 @@ var (
 				},
 			},
 		},
-		/*{
-			Name:        "average",
-			Description: "Gives you an average of your calories consumed over the provided days",
+		{
+			Name:        "avg",
+			Description: "Gives you an average of your calories consumed over X days",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
+					Type:        discordgo.ApplicationCommandOptionInteger,
 					Name:        "days",
 					Description: "The amount of days to calculate the average for",
+					MinValue:    &minAverageDays,
 					MaxValue:    7,
 					Required:    true,
 				},
 			},
-		}, */
+		},
 		{
 			Name:        "rem",
 			Description: "Gives your remaining calories for the day",
@@ -73,6 +76,14 @@ var (
 		{
 			Name:        "list",
 			Description: "List the days log entries",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "date",
+					Description: "The date to list",
+					Required:    false,
+				},
+			},
 		},
 		{
 			Name:        "del",
@@ -131,6 +142,12 @@ var (
 					Description: "The actual weight in grams of the packet",
 					Required:    true,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "fooditem",
+					Description: "The name of the food product",
+					Required:    false,
+				},
 			},
 		},
 	}
@@ -143,6 +160,7 @@ var (
 		"conv":   HandleConvCommand,
 		"list":   HandleListCommand,
 		"rem":    HandleRemCommand,
+		"avg":    HandleAverageCommand,
 	}
 
 	registeredCommands = make([]*discordgo.ApplicationCommand, len(commands))
@@ -201,6 +219,17 @@ func CreateInteractionResponse(content string) *discordgo.InteractionResponse {
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: content,
+		},
+	}
+	return interactionResponse
+}
+
+func CreateEphemeralInteractionResponse(content string) *discordgo.InteractionResponse {
+	interactionResponse := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	}
 	return interactionResponse

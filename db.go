@@ -127,12 +127,12 @@ func DeleteUserFoodLog(userId string, logId int64) (int64, error) {
 	return n, nil
 }
 
-func FetchDailyFoodLogs(userId string) ([]FoodLog, error) {
+func FetchDailyFoodLogs(userId string, date string) ([]FoodLog, error) {
 	var foodLogs []FoodLog
 	rows, err := db.QueryContext(
 		context.Background(),
-		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time) = CURRENT_DATE`,
-		userId,
+		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
+		userId, date,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -174,6 +174,34 @@ func FetchConsumedCalories(userId string) (int64, error) {
 	return consumedCalories, nil
 }
 
+func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
+	row := db.QueryRowContext(
+		context.Background(),
+		`SELECT AVG(daily_sum) average_calories
+		FROM (
+			SELECT SUM(calories) daily_sum
+			FROM food_log 
+			WHERE user_id=?
+			AND DATE(date_time) BETWEEN ? AND CURRENT_DATE
+			GROUP BY DATE(date_time)
+		) AS daily_calories`,
+		userId, date,
+	)
+
+	var averageCalories int64
+
+	err := row.Scan(&averageCalories)
+	if err != nil && err == sql.ErrNoRows {
+		return 0, err
+	}
+
+	if err != nil {
+		return averageCalories, err
+	}
+
+	return averageCalories, nil
+}
+
 func FetchRemainingCalories(userId string) (int64, error) {
 	row := db.QueryRowContext(
 		context.Background(),
@@ -198,4 +226,27 @@ func FetchRemainingCalories(userId string) (int64, error) {
 	}
 
 	return remainingCalories, nil
+}
+
+func FetchFoodLogDaysCount(userId string) (int64, error) {
+	row := db.QueryRowContext(
+		context.Background(),
+		`SELECT COUNT(DISTINCT DATE(date_time)) AS days_count
+		FROM food_log
+		WHERE user_id=?`,
+		userId,
+	)
+
+	var daysDataCount int64
+
+	err := row.Scan(&daysDataCount)
+	if err != nil && err == sql.ErrNoRows {
+		return 0, err
+	}
+
+	if err != nil {
+		return daysDataCount, err
+	}
+
+	return daysDataCount, nil
 }
