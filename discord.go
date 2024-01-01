@@ -75,7 +75,7 @@ var (
 		},
 		{
 			Name:        "list",
-			Description: "List the days log entries",
+			Description: "List log entries for the current day or if the specified day if provided.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -120,18 +120,18 @@ var (
 		},
 		{
 			Name:        "conv",
-			Description: "Figure out actual calories consumed when only given per X grams",
+			Description: "Figure out actual calories consumed when only given per X units",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "grams",
-					Description: "The per X grams given on the nutrition label",
+					Name:        "units",
+					Description: "The per X units (e.g grams or ml) given on the nutrition label",
 					Required:    true,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionNumber,
 					Name:        "calories",
-					Description: "The amount of calories for the grams specified",
+					Description: "The amount of calories for the unit specified",
 					Required:    true,
 					MinValue:    &minCalorieIntake,
 					MaxValue:    maxItemCalories,
@@ -139,7 +139,7 @@ var (
 				{
 					Type:        discordgo.ApplicationCommandOptionNumber,
 					Name:        "weight",
-					Description: "The actual weight in grams of the packet",
+					Description: "The actual weight in units of the packet",
 					Required:    true,
 				},
 				{
@@ -224,6 +224,7 @@ func CreateInteractionResponse(content string) *discordgo.InteractionResponse {
 	return interactionResponse
 }
 
+// Message only shows for the user that triggered it
 func CreateEphemeralInteractionResponse(content string) *discordgo.InteractionResponse {
 	interactionResponse := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,

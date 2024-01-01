@@ -127,12 +127,13 @@ func DeleteUserFoodLog(userId string, logId int64) (int64, error) {
 	return n, nil
 }
 
-func FetchDailyFoodLogs(userId string, date string) ([]FoodLog, error) {
+func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
+	dateStr := date.Format("2006-01-02")
 	var foodLogs []FoodLog
 	rows, err := db.QueryContext(
 		context.Background(),
 		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
-		userId, date,
+		userId, dateStr,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -152,11 +153,13 @@ func FetchDailyFoodLogs(userId string, date string) ([]FoodLog, error) {
 	return foodLogs, err
 }
 
-func FetchConsumedCalories(userId string) (int64, error) {
+func FetchConsumedCaloriesForDate(userId string, date time.Time) (int64, error) {
+	dateStr := date.Format("2006-01-02")
+
 	row := db.QueryRowContext(
 		context.Background(),
-		`SELECT SUM(calories) consumed FROM food_log WHERE user_id=? AND DATE(date_time) = CURRENT_DATE`,
-		userId,
+		`SELECT SUM(calories) consumed FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
+		userId, dateStr,
 	)
 
 	var consumedCalories int64
@@ -202,15 +205,16 @@ func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
 	return averageCalories, nil
 }
 
-func FetchRemainingCalories(userId string) (int64, error) {
+func FetchRemainingCalories(userId string, date time.Time) (int64, error) {
+	dateStr := date.Format("2006-01-02")
 	row := db.QueryRowContext(
 		context.Background(),
 		`SELECT user.daily_calories - COALESCE(SUM(food_log.calories), 0) AS remaining_calories
 		FROM user
-		LEFT JOIN food_log ON user.id = food_log.user_id AND DATE(food_log.date_time) = CURRENT_DATE
+		LEFT JOIN food_log ON user.id = food_log.user_id AND DATE(food_log.date_time)=?
 		WHERE user.id=?
 		GROUP BY user.id, user.daily_calories;`,
-		userId,
+		dateStr, userId,
 	)
 
 	var remainingCalories int64

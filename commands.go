@@ -11,7 +11,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func convertOptionsToMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+func convertOptionsToMap(i *discordgo.InteractionCreate) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+	// Access options in the order provided by the user.
+	options := i.ApplicationCommandData().Options
 	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
 	for _, opt := range options {
 		optionMap[opt.Name] = opt
@@ -23,11 +25,8 @@ func HandleSetCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userId := i.Member.User.ID
 	userDisplayName := i.Member.User.GlobalName
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
 	// Convert the slice into a map
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
 	calories := optionMap["calories"].IntValue()
 
@@ -64,10 +63,7 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
 	foodItem := optionMap["fooditem"].StringValue()
 	calories := optionMap["calories"].IntValue()
@@ -85,7 +81,7 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	remaining, remainingErr := FetchRemainingCalories(userId)
+	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Updated the food log but couldn't fetch the remaining calories when updating for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully added to your food log with the ID %v.\nCould not retrieve remaining calories at this time.", id)))
@@ -100,10 +96,7 @@ func HandleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userId := i.Member.User.ID
 	userDisplayName := i.Member.User.GlobalName
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
 	logId := optionMap["logid"].IntValue()
 	foodItem := optionMap["fooditem"].StringValue()
@@ -129,7 +122,7 @@ func HandleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	remaining, remainingErr := FetchRemainingCalories(userId)
+	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Updated the food log but couldn't fetch the remaining calories when updating for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully updated food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId)))
@@ -144,11 +137,8 @@ func HandleDeleteCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userId := i.Member.User.ID
 	userDisplayName := i.Member.User.GlobalName
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
 	// Convert the slice into a map
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
 	logId := optionMap["logid"].IntValue()
 
@@ -165,7 +155,7 @@ func HandleDeleteCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	remaining, remainingErr := FetchRemainingCalories(userId)
+	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Deleted the food log but couldn't fetch the remaining calories when deleting for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully deleted food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId)))
@@ -179,51 +169,28 @@ func HandleDeleteCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 func HandleConvCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userDisplayName := i.Member.User.GlobalName
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
 	// Convert the slice into a map
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
+	units := optionMap["units"].FloatValue()
 	calories := optionMap["calories"].FloatValue()
-	grams := optionMap["grams"].FloatValue()
 	weight := optionMap["weight"].FloatValue()
 
-	perGram := calories / grams
-	totalCalories := perGram * weight
+	perUnit := calories / units
+	totalCalories := perUnit * weight
 
-	foodItem, foodItemExists := optionMap["fooditem"]
-
-	if foodItemExists {
+	if foodItem, ok := optionMap["fooditem"]; ok {
 		log.Printf("User %v provided the optional food item name when converting.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%v\n%.2f calories per gram \nTotal amount of calories is %.0f", foodItem.StringValue(), perGram, math.Ceil(totalCalories))))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%v\n%.2f calories per unit \nTotal amount of calories is %.0f", foodItem.StringValue(), perUnit, math.Ceil(totalCalories))))
 	} else {
 		log.Printf("User %v did not provide the optional food item name when converting.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%.2f calories per gram \nTotal amount of calories is %.0f", perGram, math.Ceil(totalCalories))))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%.2f calories per unit \nTotal amount of calories is %.0f", perUnit, math.Ceil(totalCalories))))
 	}
 }
 
 func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userId := i.Member.User.ID
 	userDisplayName := i.Member.User.GlobalName
-
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
-	// Convert the slice into a map
-	optionMap := convertOptionsToMap(options)
-
-	var dateStr string = time.Now().Format("2006-01-02")
-	dateCmd, dateItemExists := optionMap["date"]
-	if dateItemExists {
-		date, dateParseErr := time.Parse("2006-01-02", dateCmd.StringValue())
-		if dateParseErr != nil {
-			log.Printf("Error parsing date %v for user with username %v. Error: %v", date, userDisplayName, dateParseErr)
-			s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format %v.", dateStr)))
-			return
-		}
-		dateStr = date.Format("2006-01-02")
-	}
 
 	user, userErr := FetchUserByID(userId)
 	if userErr != nil {
@@ -232,8 +199,23 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	log.Printf("Fetching daily food logs for user %v.", userDisplayName)
-	foodLogs, foodLogErr := FetchDailyFoodLogs(userId, dateStr)
+	// Convert the slice into a map
+	optionMap := convertOptionsToMap(i)
+
+	startDate := time.Now()
+	dateCmd, dateItemExists := optionMap["date"]
+	if dateItemExists {
+		date, dateParseErr := time.Parse("02/01/2006", dateCmd.StringValue())
+		if dateParseErr != nil {
+			log.Printf("Error parsing for user with username %v. Error: %v", userDisplayName, dateParseErr)
+			s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format like %v.", startDate.Format("02/01/2006"))))
+			return
+		}
+		startDate = date
+	}
+
+	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, startDate)
+	foodLogs, foodLogErr := FetchDailyFoodLogs(userId, startDate)
 	if foodLogErr != nil {
 		log.Printf("Error fetching food logs for user %v: %v", userDisplayName, foodLogErr)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching food logs, please try again..."))
@@ -241,20 +223,20 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	if len(foodLogs) == 0 {
-		log.Printf("User %v currently has no logs.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("No logs found for you today."))
+		log.Printf("User %v has no logs on %v.", userDisplayName, startDate.Format("02/01/2006"))
+		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("No logs found for you on %v.", startDate.Format("02/01/2006"))))
 		return
 	}
 
-	consumed, consumedErr := FetchConsumedCalories(userId)
-	remaining, remainingErr := FetchRemainingCalories(userId)
+	consumed, consumedErr := FetchConsumedCaloriesForDate(userId, startDate)
+	remaining, remainingErr := FetchRemainingCalories(userId, startDate)
 	if consumedErr != nil || remainingErr != nil {
 		log.Printf("Error fetching consumed or remaining calories for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching consumed or remaining calories, please try again..."))
 		return
 	}
 
-	embed := createFoodLogEmbed(userDisplayName, dateStr, foodLogs, int64(user.daily_calories), consumed, remaining)
+	embed := createFoodLogEmbed(userDisplayName, startDate, foodLogs, int64(user.daily_calories), consumed, remaining)
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -270,7 +252,7 @@ func HandleRemCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userDisplayName := i.Member.User.GlobalName
 
 	log.Printf("Fetching remaining calories for user %v.", userDisplayName)
-	remaining, remainingErr := FetchRemainingCalories(userId)
+	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Error fetching remaining calories for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching remaining calories, please try again..."))
@@ -298,11 +280,8 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 		return
 	}
 
-	// Access options in the order provided by the user.
-	options := i.ApplicationCommandData().Options
-
 	// Convert the slice into a map
-	optionMap := convertOptionsToMap(options)
+	optionMap := convertOptionsToMap(i)
 
 	days := optionMap["days"].IntValue()
 
@@ -325,7 +304,7 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("You have consumed an average of %d calories over %d days.", averageCalories, days)))
 }
 
-func createFoodLogEmbed(username string, date string, foodLogs []FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
+func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
 	var foodItemNames strings.Builder
 	var calories strings.Builder
 	var times strings.Builder
@@ -339,7 +318,7 @@ func createFoodLogEmbed(username string, date string, foodLogs []FoodLog, daily 
 	now := time.Now()
 
 	embed := &discordgo.MessageEmbed{
-		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date),
+		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date.Format("02/01/2006")),
 		Author: &discordgo.MessageEmbedAuthor{},
 		Color:  0x89CFF0,
 		Fields: []*discordgo.MessageEmbedField{
