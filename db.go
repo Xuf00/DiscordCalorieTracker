@@ -19,6 +19,7 @@ type FoodLog struct {
 	user_id   string
 	food_item string
 	calories  int16
+	quantity  int16
 	date_time time.Time
 }
 
@@ -41,6 +42,7 @@ func InitDatabase() {
 			user_id TEXT NOT NULL,
 			food_item TEXT NOT NULL,
 			calories INTEGER NOT NULL,
+			quantity INTEGER NOT NULL,
 			date_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (user_id) REFERENCES user(id)
 		)`,
@@ -82,9 +84,12 @@ func AddUserFoodLog(foodLog *FoodLog) (int64, error) {
 	log.Printf("Adding a food log to the database for user %v", foodLog.user_id)
 	result, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO food_log (user_id, food_item, calories) VALUES (?, ?, ?)`,
-		foodLog.user_id, foodLog.food_item, foodLog.calories,
+		`INSERT INTO food_log (user_id, food_item, calories, quantity) VALUES (?, ?, ?, ?)`,
+		foodLog.user_id, foodLog.food_item, foodLog.calories, foodLog.quantity,
 	)
+	if err != nil {
+		return 0, err
+	}
 
 	id, err := result.LastInsertId()
 
@@ -94,8 +99,8 @@ func AddUserFoodLog(foodLog *FoodLog) (int64, error) {
 func UpdateUserFoodLog(foodLog *FoodLog) (int64, error) {
 	result, err := db.ExecContext(
 		context.Background(),
-		`UPDATE food_log SET food_item=?, calories=? WHERE id=? AND user_id=?`,
-		foodLog.food_item, foodLog.calories, foodLog.id, foodLog.user_id,
+		`UPDATE food_log SET food_item=?, calories=?, quantity=? WHERE id=? AND user_id=?`,
+		foodLog.food_item, foodLog.calories, foodLog.quantity, foodLog.id, foodLog.user_id,
 	)
 	if err != nil {
 		return 0, err
@@ -144,7 +149,7 @@ func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
 		var foodLog FoodLog
 
 		if err := rows.Scan(
-			&foodLog.id, &foodLog.user_id, &foodLog.food_item, &foodLog.calories, &foodLog.date_time,
+			&foodLog.id, &foodLog.user_id, &foodLog.food_item, &foodLog.calories, &foodLog.quantity, &foodLog.date_time,
 		); err != nil {
 			return nil, err
 		}

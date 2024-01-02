@@ -13,6 +13,7 @@ var (
 	maxItemCalories  = 5000.0
 
 	minAverageDays = 2.0
+	minQuantity    = 1.0
 
 	commands = []*discordgo.ApplicationCommand{
 		{
@@ -71,6 +72,13 @@ var (
 					MinValue:    &minCalorieIntake,
 					MaxValue:    maxItemCalories,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "quantity",
+					Description: "The quantity consumed",
+					Required:    false,
+					MinValue:    &minQuantity,
+				},
 			},
 		},
 		{
@@ -115,6 +123,13 @@ var (
 					Required:    true,
 					MinValue:    &minCalorieIntake,
 					MaxValue:    maxItemCalories,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "quantity",
+					Description: "The quantity consumed",
+					Required:    false,
+					MinValue:    &minQuantity,
 				},
 			},
 		},

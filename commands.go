@@ -72,6 +72,13 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		user_id:   userId,
 		food_item: foodItem,
 		calories:  int16(calories),
+		quantity:  1,
+	}
+
+	if quantity, ok := optionMap["quantity"]; ok {
+		itemQuantity := int16(quantity.IntValue())
+		foodLog.quantity = itemQuantity
+		foodLog.calories = foodLog.calories * itemQuantity
 	}
 
 	id, addFoodLogErr := AddUserFoodLog(&foodLog)
@@ -107,6 +114,13 @@ func HandleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		user_id:   userId,
 		food_item: foodItem,
 		calories:  int16(calories),
+		quantity:  1,
+	}
+
+	if quantity, ok := optionMap["quantity"]; ok {
+		itemQuantity := int16(quantity.IntValue())
+		foodLog.quantity = itemQuantity
+		foodLog.calories = foodLog.calories * itemQuantity
 	}
 
 	n, updateErr := UpdateUserFoodLog(&foodLog)
@@ -310,7 +324,11 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, dai
 	var times strings.Builder
 
 	for _, foodLog := range foodLogs {
-		foodItemNames.WriteString(fmt.Sprintf("(%d) %s\n", foodLog.id, foodLog.food_item))
+		if foodLog.quantity > 1 {
+			foodItemNames.WriteString(fmt.Sprintf("(%d) x%d %s\n", foodLog.id, foodLog.quantity, foodLog.food_item))
+		} else {
+			foodItemNames.WriteString(fmt.Sprintf("(%d) %s\n", foodLog.id, foodLog.food_item))
+		}
 		calories.WriteString(fmt.Sprintf("%d\n", foodLog.calories))
 		times.WriteString(fmt.Sprintf("%s\n", foodLog.date_time.Format("15:04")))
 	}
