@@ -206,15 +206,30 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	userId := i.Member.User.ID
 	userDisplayName := i.Member.User.GlobalName
 
+	// Convert the slice into a map
+	optionMap := convertOptionsToMap(i)
+
+	userParam, userProvided := optionMap["user"]
+	if userProvided {
+		user := userParam.UserValue(s)
+		isBot := user.Bot
+		userId = user.ID
+		userDisplayName = user.GlobalName
+
+		if isBot {
+			log.Printf("User %v has requested to see a bots list which isn't valid.", i.Member.User.GlobalName)
+			s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("That is a bot, please select a user."))
+			return
+		}
+		log.Printf("User %v has requested to see the list of user %v.", i.Member.User.GlobalName, userDisplayName)
+	}
+
 	user, userErr := FetchUserByID(userId)
 	if userErr != nil {
 		log.Printf("Error fetching user with ID %v and username %v. Error: %v", userId, userDisplayName, userErr)
 		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching user, please try again..."))
 		return
 	}
-
-	// Convert the slice into a map
-	optionMap := convertOptionsToMap(i)
 
 	startDate := time.Now()
 	dateCmd, dateItemExists := optionMap["date"]
@@ -228,7 +243,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		startDate = date
 	}
 
-	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, startDate)
+	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, startDate.Format("02/01/2006"))
 	foodLogs, foodLogErr := FetchDailyFoodLogs(userId, startDate)
 	if foodLogErr != nil {
 		log.Printf("Error fetching food logs for user %v: %v", userDisplayName, foodLogErr)
@@ -238,7 +253,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	if len(foodLogs) == 0 {
 		log.Printf("User %v has no logs on %v.", userDisplayName, startDate.Format("02/01/2006"))
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("No logs found for you on %v.", startDate.Format("02/01/2006"))))
+		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, startDate.Format("02/01/2006"))))
 		return
 	}
 

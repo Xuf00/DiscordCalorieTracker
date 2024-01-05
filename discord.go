@@ -91,6 +91,12 @@ var (
 					Description: "The date to list",
 					Required:    false,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionUser,
+					Name:        "user",
+					Description: "Which users list to view",
+					Required:    false,
+				},
 			},
 		},
 		{
