@@ -382,13 +382,13 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, dai
 				Inline: true,
 			},
 			{
-				Name:   "Consumed",
-				Value:  strconv.FormatInt(consumed, 10),
+				Name:   "Remaining",
+				Value:  strconv.FormatInt(remaining, 10),
 				Inline: true,
 			},
 			{
-				Name:   "Remaining",
-				Value:  strconv.FormatInt(remaining, 10),
+				Name:   "Total",
+				Value:  strconv.FormatInt(consumed, 10),
 				Inline: true,
 			},
 		},
