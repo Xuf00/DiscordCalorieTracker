@@ -356,6 +356,9 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, dai
 		Color:  0x89CFF0,
 		Fields: []*discordgo.MessageEmbedField{
 			{
+				Name: "\u200b",
+			},
+			{
 				Name:   "Time",
 				Value:  times.String(),
 				Inline: true,
@@ -369,6 +372,9 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, dai
 				Name:   "Calories",
 				Value:  calories.String(),
 				Inline: true,
+			},
+			{
+				Name: "\u200b",
 			},
 			{
 				Name:   "Daily",
