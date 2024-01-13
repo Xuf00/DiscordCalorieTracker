@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"time"
 
@@ -114,6 +115,34 @@ func UpdateUserFoodLog(foodLog *FoodLog) (int64, error) {
 	return n, nil
 }
 
+func UpdateFoodLogQuantity(userId string, logId int64, direction string) (int64, error) {
+	var query string
+	switch direction {
+	case "inc":
+		query = `UPDATE food_log SET quantity=quantity+1 WHERE id=? AND user_id=?`
+	case "dec":
+		query = `UPDATE food_log SET quantity=quantity-1 WHERE id=? AND user_id=? AND quantity > 1`
+	default:
+		return 0, errors.New("invalid direction")
+	}
+
+	result, err := db.ExecContext(
+		context.Background(),
+		query,
+		logId, userId,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
 func DeleteUserFoodLog(userId string, logId int64) (int64, error) {
 	result, err := db.ExecContext(
 		context.Background(),
@@ -163,7 +192,7 @@ func FetchConsumedCaloriesForDate(userId string, date time.Time) (int64, error) 
 
 	row := db.QueryRowContext(
 		context.Background(),
-		`SELECT SUM(calories) consumed FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
+		`SELECT SUM(calories*quantity) consumed FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
 		userId, dateStr,
 	)
 
@@ -187,7 +216,7 @@ func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
 		context.Background(),
 		`SELECT AVG(daily_sum) average_calories
 		FROM (
-			SELECT SUM(calories) daily_sum
+			SELECT SUM(calories*quantity) daily_sum
 			FROM food_log 
 			WHERE user_id=?
 			AND DATE(date_time) BETWEEN ? AND CURRENT_DATE
@@ -214,7 +243,7 @@ func FetchRemainingCalories(userId string, date time.Time) (int64, error) {
 	dateStr := date.Format("2006-01-02")
 	row := db.QueryRowContext(
 		context.Background(),
-		`SELECT user.daily_calories - COALESCE(SUM(food_log.calories), 0) AS remaining_calories
+		`SELECT user.daily_calories - COALESCE(SUM(food_log.calories*food_log.quantity), 0) AS remaining_calories
 		FROM user
 		LEFT JOIN food_log ON user.id = food_log.user_id AND DATE(food_log.date_time)=?
 		WHERE user.id=?

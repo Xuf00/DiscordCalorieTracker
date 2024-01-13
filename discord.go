@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -173,6 +174,11 @@ var (
 		},
 	}
 
+	componentHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		"flquantity": HandleModifyFoodQuantity,
+		"fllist":     HandleUpdateList,
+	}
+
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"set":    HandleSetCommand,
 		"add":    HandleAddCommand,
@@ -230,29 +236,69 @@ func onReady(s *discordgo.Session, r *discordgo.Ready) {
 }
 
 func handleCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-		h(s, i)
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		log.Printf("Handling slash command interaction %v", i.ApplicationCommandData().Name)
+		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+			h(s, i)
+		}
+
+	case discordgo.InteractionMessageComponent:
+		log.Printf("Handling component interaction %v", i.MessageComponentData().CustomID)
+		idPrefix := strings.Split(i.MessageComponentData().CustomID, "_")[0]
+		if h, ok := componentHandlers[idPrefix]; ok {
+			h(s, i)
+		}
 	}
+
 }
 
-func CreateInteractionResponse(content string) *discordgo.InteractionResponse {
+func CreateInteractionResponse(content string, ephemeral bool, messageComponents []discordgo.MessageComponent) *discordgo.InteractionResponse {
 	interactionResponse := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: content,
+			/* Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Emoji: discordgo.ComponentEmoji{
+								Name: ":arrow_up:",
+							},
+							Label: "Increase Quantity",
+							Style: discordgo.SecondaryButton,
+							CustomID: "",
+						},
+						discordgo.Button{
+							Emoji: discordgo.ComponentEmoji{
+								Name: "🔧",
+							},
+							Label: "Discord developers",
+							Style: discordgo.LinkButton,
+							URL:   "https://discord.gg/discord-developers",
+						},
+						discordgo.Button{
+							Emoji: discordgo.ComponentEmoji{
+								Name: "🦫",
+							},
+							Label: "Discord Gophers",
+							Style: discordgo.LinkButton,
+							URL:   "https://discord.gg/7RuRrVHyXF",
+						},
+					},
+				},
+			}, */
 		},
 	}
-	return interactionResponse
-}
 
-// Message only shows for the user that triggered it
-func CreateEphemeralInteractionResponse(content string) *discordgo.InteractionResponse {
-	interactionResponse := &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
+	if ephemeral {
+		// Message only shows for the user that triggered it
+		interactionResponse.Data.Flags = discordgo.MessageFlagsEphemeral
 	}
+
+	if len(messageComponents) > 0 {
+		interactionResponse.Data.Components = messageComponents
+	}
+
 	return interactionResponse
 }

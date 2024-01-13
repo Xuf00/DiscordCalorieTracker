@@ -38,12 +38,12 @@ func HandleSetCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	_, setCaloriesErr := SetUserCalories(&user)
 	if setCaloriesErr != nil {
 		log.Printf("Error setting calories for user with ID %v and username %v. Error: %v", userId, userDisplayName, setCaloriesErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("There was an error, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("There was an error, please try again...", true, nil))
 		return
 	}
 
 	log.Printf("Successfully set daily calorie intake to %d for user with ID %v and username %v.", calories, userId, userDisplayName)
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Your daily calorie intake has successfully been set to %d.", calories)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Your daily calorie intake has successfully been set to %d.", calories), true, nil))
 }
 
 func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -53,13 +53,13 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	user, userErr := FetchUserByID(userId)
 	if userErr != nil {
 		log.Printf("Error fetching user with ID %v and username %v. Error: %v", userId, userDisplayName, userErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching user, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching user, please try again...", true, nil))
 		return
 	}
 
 	if (User{}) == user {
 		log.Printf("User with ID %v and username %v has tried to add without calling /set first.", userId, userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Set your daily calories first using the /set command."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Set your daily calories first using the /set command.", true, nil))
 		return
 	}
 
@@ -78,25 +78,54 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if quantity, ok := optionMap["quantity"]; ok {
 		itemQuantity := int16(quantity.IntValue())
 		foodLog.quantity = itemQuantity
-		foodLog.calories = foodLog.calories * itemQuantity
+		//foodLog.calories = foodLog.calories * itemQuantity
 	}
 
 	id, addFoodLogErr := AddUserFoodLog(&foodLog)
 	if addFoodLogErr != nil {
 		log.Printf("Error adding food log for user with ID %v and username %v. Error: %v", userId, userDisplayName, addFoodLogErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("There was an error, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("There was an error, please try again...", true, nil))
 		return
 	}
 
 	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Updated the food log but couldn't fetch the remaining calories when updating for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully added to your food log with the ID %v.\nCould not retrieve remaining calories at this time.", id)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully added to your food log with the ID %v.\nCould not retrieve remaining calories at this time.", id), true, nil))
 		return
 	}
 
+	messageComponents := []discordgo.MessageComponent{}
+	actionRow := discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{
+				Emoji: discordgo.ComponentEmoji{
+					Name: "⬆️",
+				},
+				Label:    "Increase Quantity",
+				Style:    discordgo.SecondaryButton,
+				CustomID: fmt.Sprintf("flquantity_inc_%s_%d", userId, id),
+			},
+		},
+	}
+
+	if foodLog.quantity > 1 {
+		decreaseQuantityBtn := discordgo.Button{
+			Emoji: discordgo.ComponentEmoji{
+				Name: "⬇️",
+			},
+			Label:    "Decrease Quantity",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("flquantity_dec_%s_%d", userId, id),
+		}
+
+		actionRow.Components = append(actionRow.Components, decreaseQuantityBtn)
+	}
+
+	messageComponents = append(messageComponents, actionRow)
+
 	log.Printf("Aded food log %v for user %v and retrieved remaining calories.", id, userDisplayName)
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully added food log with the ID %v.\nYou have %d calories remaining today.", id, remaining)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully added food log with the ID %v.\nYou have %d calories remaining today.", id, remaining), true, messageComponents))
 }
 
 func HandleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -120,31 +149,31 @@ func HandleUpdateCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if quantity, ok := optionMap["quantity"]; ok {
 		itemQuantity := int16(quantity.IntValue())
 		foodLog.quantity = itemQuantity
-		foodLog.calories = foodLog.calories * itemQuantity
+		//foodLog.calories = foodLog.calories * itemQuantity
 	}
 
 	n, updateErr := UpdateUserFoodLog(&foodLog)
 	if updateErr != nil {
 		log.Printf("Error updating food log with ID %v for user %v: %v", logId, userDisplayName, updateErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("There was an error, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("There was an error, please try again...", true, nil))
 		return
 	}
 
 	if n == 0 {
 		log.Printf("Could not find a food log with ID %v for user %v.", logId, userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Could not find a food log with ID %v.", logId)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Could not find a food log with ID %v.", logId), true, nil))
 		return
 	}
 
 	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Updated the food log but couldn't fetch the remaining calories when updating for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully updated food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully updated food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId), true, nil))
 		return
 	}
 
 	log.Printf("Updated food log %v for user %v and retrieved remaining calories.", logId, userDisplayName)
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully updated food log with the ID %v.\nYou have %d calories remaining today.", logId, remaining)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully updated food log with the ID %v.\nYou have %d calories remaining today.", logId, remaining), true, nil))
 }
 
 func HandleDeleteCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -159,25 +188,25 @@ func HandleDeleteCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	n, deleteErr := DeleteUserFoodLog(userId, logId)
 	if deleteErr != nil {
 		log.Printf("Error deleting food log for user %v: %v", userDisplayName, deleteErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("There was an error, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("There was an error, please try again...", true, nil))
 		return
 	}
 
 	if n == 0 {
 		log.Printf("Could not find a food log with ID %v for user %v.", logId, userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Could not find a food log with ID %v.", logId)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Could not find a food log with ID %v.", logId), true, nil))
 		return
 	}
 
 	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Deleted the food log but couldn't fetch the remaining calories when deleting for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully deleted food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully deleted food log with the ID %v.\nCould not retrieve remaining calories at this time.", logId), true, nil))
 		return
 	}
 
 	log.Printf("Deleted food log %v for user %v and retrieved remaining calories.", logId, userDisplayName)
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Successfully deleted food log with the ID %v.\nYou have %d calories remaining today.", logId, remaining)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Successfully deleted food log with the ID %v.\nYou have %d calories remaining today.", logId, remaining), true, nil))
 }
 
 func HandleConvCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -195,10 +224,10 @@ func HandleConvCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	if foodItem, ok := optionMap["fooditem"]; ok {
 		log.Printf("User %v provided the optional food item name when converting.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%v\n%.2f calories per unit \nTotal amount of calories is %.0f", foodItem.StringValue(), perUnit, math.Ceil(totalCalories))))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%v\n%.2f calories per unit \nTotal amount of calories is %.0f", foodItem.StringValue(), perUnit, math.Ceil(totalCalories)), false, nil))
 	} else {
 		log.Printf("User %v did not provide the optional food item name when converting.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%.2f calories per unit \nTotal amount of calories is %.0f", perUnit, math.Ceil(totalCalories))))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("%.2f calories per unit \nTotal amount of calories is %.0f", perUnit, math.Ceil(totalCalories)), false, nil))
 	}
 }
 
@@ -218,7 +247,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 		if isBot {
 			log.Printf("User %v has requested to see a bots list which isn't valid.", i.Member.User.GlobalName)
-			s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("That is a bot, please select a user."))
+			s.InteractionRespond(i.Interaction, CreateInteractionResponse("That is a bot, please select a user.", true, nil))
 			return
 		}
 		log.Printf("User %v has requested to see the list of user %v.", i.Member.User.GlobalName, userDisplayName)
@@ -227,7 +256,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	user, userErr := FetchUserByID(userId)
 	if userErr != nil {
 		log.Printf("Error fetching user with ID %v and username %v. Error: %v", userId, userDisplayName, userErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching user, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching user, please try again...", true, nil))
 		return
 	}
 
@@ -237,7 +266,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		date, dateParseErr := time.Parse("02/01/2006", dateCmd.StringValue())
 		if dateParseErr != nil {
 			log.Printf("Error parsing for user with username %v. Error: %v", userDisplayName, dateParseErr)
-			s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format like %v.", startDate.Format("02/01/2006"))))
+			s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format like %v.", startDate.Format("02/01/2006")), true, nil))
 			return
 		}
 		startDate = date
@@ -247,13 +276,13 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	foodLogs, foodLogErr := FetchDailyFoodLogs(userId, startDate)
 	if foodLogErr != nil {
 		log.Printf("Error fetching food logs for user %v: %v", userDisplayName, foodLogErr)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching food logs, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching food logs, please try again...", true, nil))
 		return
 	}
 
 	if len(foodLogs) == 0 {
 		log.Printf("User %v has no logs on %v.", userDisplayName, startDate.Format("02/01/2006"))
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, startDate.Format("02/01/2006"))))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, startDate.Format("02/01/2006")), true, nil))
 		return
 	}
 
@@ -261,7 +290,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	remaining, remainingErr := FetchRemainingCalories(userId, startDate)
 	if consumedErr != nil || remainingErr != nil {
 		log.Printf("Error fetching consumed or remaining calories for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching consumed or remaining calories, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching consumed or remaining calories, please try again...", true, nil))
 		return
 	}
 
@@ -271,6 +300,20 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{
 				embed,
+			},
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Emoji: discordgo.ComponentEmoji{
+								Name: "♻️",
+							},
+							Label:    "Update",
+							Style:    discordgo.SecondaryButton,
+							CustomID: fmt.Sprintf("fllist_%s_%s_%s", userId, userDisplayName, startDate.Format("02/01/2006")),
+						},
+					},
+				},
 			},
 		},
 	})
@@ -284,17 +327,17 @@ func HandleRemCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	remaining, remainingErr := FetchRemainingCalories(userId, time.Now())
 	if remainingErr != nil {
 		log.Printf("Error fetching remaining calories for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching remaining calories, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching remaining calories, please try again...", true, nil))
 		return
 	}
 
 	if remaining == 10000 {
 		log.Printf("Couldn't get the remaining calories for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Couldn't work out your remaining calories, make sure you've used /set to set your daily calories."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Couldn't work out your remaining calories, make sure you've used /set to set your daily calories.", true, nil))
 		return
 	}
 
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("You have %d calories remaining today.", remaining)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("You have %d calories remaining today.", remaining), true, nil))
 }
 
 func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -305,7 +348,7 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 	count, countErr := FetchFoodLogDaysCount(userId)
 	if countErr != nil {
 		log.Printf("Error checking if the user %v has enough data to get an average.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error checking your average calories, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error checking your average calories, please try again...", true, nil))
 		return
 	}
 
@@ -316,7 +359,7 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 
 	if count != days {
 		log.Printf("User %v doesn't have enough data to get an average. They have %d days of data but requested an average for %d.", userDisplayName, count, days)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("You only have enough data to request an average over %d days.", count)))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("You only have enough data to request an average over %d days.", count), true, nil))
 		return
 	}
 
@@ -325,12 +368,12 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 	averageCalories, averageCalErr := FetchAverageConsumedCalories(userId, startDate)
 	if averageCalErr != nil {
 		log.Printf("Error fetching average calories for user %v.", userDisplayName)
-		s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse("Error fetching your average calories, please try again..."))
+		s.InteractionRespond(i.Interaction, CreateInteractionResponse("Error fetching your average calories, please try again...", true, nil))
 		return
 	}
 
 	log.Printf("Retrieved average calories for user %v.", userDisplayName)
-	s.InteractionRespond(i.Interaction, CreateEphemeralInteractionResponse(fmt.Sprintf("You have consumed an average of %d calories over %d days.", averageCalories, days)))
+	s.InteractionRespond(i.Interaction, CreateInteractionResponse(fmt.Sprintf("You have consumed an average of %d calories over %d days.", averageCalories, days), true, nil))
 }
 
 func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
@@ -339,12 +382,14 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []FoodLog, dai
 	var times strings.Builder
 
 	for _, foodLog := range foodLogs {
+		totalCalories := foodLog.calories
 		if foodLog.quantity > 1 {
+			totalCalories = foodLog.calories * foodLog.quantity
 			foodItemNames.WriteString(fmt.Sprintf("(%d) x%d %s\n", foodLog.id, foodLog.quantity, foodLog.food_item))
 		} else {
 			foodItemNames.WriteString(fmt.Sprintf("(%d) %s\n", foodLog.id, foodLog.food_item))
 		}
-		calories.WriteString(fmt.Sprintf("%d\n", foodLog.calories))
+		calories.WriteString(fmt.Sprintf("%d\n", totalCalories))
 		times.WriteString(fmt.Sprintf("%s\n", foodLog.date_time.Format("15:04")))
 	}
 
