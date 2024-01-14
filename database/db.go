@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"context"
@@ -11,28 +11,28 @@ import (
 )
 
 type User struct {
-	id             string
-	daily_calories int16
+	ID            string
+	DailyCalories int16
 }
 
 type FoodLog struct {
-	id        int64
-	user_id   string
-	food_item string
-	calories  int16
-	quantity  int16
-	date_time time.Time
+	ID       int64
+	UserID   string
+	FoodItem string
+	Calories int16
+	Quantity int16
+	DateTime time.Time
 }
 
-var db *sql.DB
+var DB *sql.DB
 
 func InitDatabase() {
 	var err error
-	db, err = sql.Open("sqlite", "app.db")
+	DB, err = sql.Open("sqlite", "app.db")
 	if err != nil {
 		log.Fatalf("Could not connect to DB: %v", err)
 	}
-	_, err = db.ExecContext(
+	_, err = DB.ExecContext(
 		context.Background(),
 		`CREATE TABLE IF NOT EXISTS user (
 			id TEXT PRIMARY KEY,
@@ -57,12 +57,12 @@ func InitDatabase() {
 func FetchUserByID(id string) (User, error) {
 	var user User
 
-	row := db.QueryRowContext(
+	row := DB.QueryRowContext(
 		context.Background(),
 		`SELECT * FROM user WHERE id=?`, id,
 	)
 
-	err := row.Scan(&user.id, &user.daily_calories)
+	err := row.Scan(&user.ID, &user.DailyCalories)
 
 	if err != nil && err != sql.ErrNoRows {
 		return user, err
@@ -72,21 +72,21 @@ func FetchUserByID(id string) (User, error) {
 }
 
 func SetUserCalories(user *User) (sql.Result, error) {
-	log.Printf("Setting the calories in the database for user %v", user.id)
-	result, err := db.ExecContext(
+	log.Printf("Setting the calories in the database for user %v", user.ID)
+	result, err := DB.ExecContext(
 		context.Background(),
 		`INSERT INTO user (id, daily_calories) VALUES (?,?) ON CONFLICT (id) DO UPDATE SET daily_calories=excluded.daily_calories`,
-		user.id, user.daily_calories,
+		user.ID, user.DailyCalories,
 	)
 	return result, err
 }
 
 func AddUserFoodLog(foodLog *FoodLog) (int64, error) {
-	log.Printf("Adding a food log to the database for user %v", foodLog.user_id)
-	result, err := db.ExecContext(
+	log.Printf("Adding a food log to the database for user %v", foodLog.UserID)
+	result, err := DB.ExecContext(
 		context.Background(),
 		`INSERT INTO food_log (user_id, food_item, calories, quantity) VALUES (?, ?, ?, ?)`,
-		foodLog.user_id, foodLog.food_item, foodLog.calories, foodLog.quantity,
+		foodLog.UserID, foodLog.FoodItem, foodLog.Calories, foodLog.Quantity,
 	)
 	if err != nil {
 		return 0, err
@@ -98,10 +98,10 @@ func AddUserFoodLog(foodLog *FoodLog) (int64, error) {
 }
 
 func UpdateUserFoodLog(foodLog *FoodLog) (int64, error) {
-	result, err := db.ExecContext(
+	result, err := DB.ExecContext(
 		context.Background(),
 		`UPDATE food_log SET food_item=?, calories=?, quantity=? WHERE id=? AND user_id=?`,
-		foodLog.food_item, foodLog.calories, foodLog.quantity, foodLog.id, foodLog.user_id,
+		foodLog.FoodItem, foodLog.Calories, foodLog.Quantity, foodLog.ID, foodLog.UserID,
 	)
 	if err != nil {
 		return 0, err
@@ -126,7 +126,7 @@ func UpdateFoodLogQuantity(userId string, logId int64, direction string) (int64,
 		return 0, errors.New("invalid direction")
 	}
 
-	result, err := db.ExecContext(
+	result, err := DB.ExecContext(
 		context.Background(),
 		query,
 		logId, userId,
@@ -144,7 +144,7 @@ func UpdateFoodLogQuantity(userId string, logId int64, direction string) (int64,
 }
 
 func DeleteUserFoodLog(userId string, logId int64) (int64, error) {
-	result, err := db.ExecContext(
+	result, err := DB.ExecContext(
 		context.Background(),
 		`DELETE FROM food_log WHERE user_id=? AND id=?`,
 		userId, logId,
@@ -164,7 +164,7 @@ func DeleteUserFoodLog(userId string, logId int64) (int64, error) {
 func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
 	dateStr := date.Format("2006-01-02")
 	var foodLogs []FoodLog
-	rows, err := db.QueryContext(
+	rows, err := DB.QueryContext(
 		context.Background(),
 		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
 		userId, dateStr,
@@ -178,7 +178,7 @@ func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
 		var foodLog FoodLog
 
 		if err := rows.Scan(
-			&foodLog.id, &foodLog.user_id, &foodLog.food_item, &foodLog.calories, &foodLog.quantity, &foodLog.date_time,
+			&foodLog.ID, &foodLog.UserID, &foodLog.FoodItem, &foodLog.Calories, &foodLog.Quantity, &foodLog.DateTime,
 		); err != nil {
 			return nil, err
 		}
@@ -190,7 +190,7 @@ func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
 func FetchConsumedCaloriesForDate(userId string, date time.Time) (int64, error) {
 	dateStr := date.Format("2006-01-02")
 
-	row := db.QueryRowContext(
+	row := DB.QueryRowContext(
 		context.Background(),
 		`SELECT SUM(calories*quantity) consumed FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
 		userId, dateStr,
@@ -212,7 +212,7 @@ func FetchConsumedCaloriesForDate(userId string, date time.Time) (int64, error) 
 }
 
 func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
-	row := db.QueryRowContext(
+	row := DB.QueryRowContext(
 		context.Background(),
 		`SELECT AVG(daily_sum) average_calories
 		FROM (
@@ -241,7 +241,7 @@ func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
 
 func FetchRemainingCalories(userId string, date time.Time) (int64, error) {
 	dateStr := date.Format("2006-01-02")
-	row := db.QueryRowContext(
+	row := DB.QueryRowContext(
 		context.Background(),
 		`SELECT user.daily_calories - COALESCE(SUM(food_log.calories*food_log.quantity), 0) AS remaining_calories
 		FROM user
@@ -267,7 +267,7 @@ func FetchRemainingCalories(userId string, date time.Time) (int64, error) {
 }
 
 func FetchFoodLogDaysCount(userId string) (int64, error) {
-	row := db.QueryRowContext(
+	row := DB.QueryRowContext(
 		context.Background(),
 		`SELECT COUNT(DISTINCT DATE(date_time)) AS days_count
 		FROM food_log

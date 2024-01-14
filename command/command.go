@@ -1,13 +1,6 @@
-package main
+package command
 
-import (
-	"log"
-	"strings"
-
-	"github.com/bwmarrin/discordgo"
-)
-
-var s *discordgo.Session
+import "github.com/bwmarrin/discordgo"
 
 var (
 	minCalorieIntake = 1.0
@@ -16,7 +9,7 @@ var (
 	minAverageDays = 2.0
 	minQuantity    = 1.0
 
-	commands = []*discordgo.ApplicationCommand{
+	CommandDefinitions = []*discordgo.ApplicationCommand{
 		{
 			Name:        "set",
 			Description: "Set your daily calorie intake",
@@ -174,12 +167,7 @@ var (
 		},
 	}
 
-	componentHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-		"flquantity": HandleModifyFoodQuantity,
-		"fllist":     HandleUpdateList,
-	}
-
-	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+	CommandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"set":    HandleSetCommand,
 		"add":    HandleAddCommand,
 		"update": HandleUpdateCommand,
@@ -189,116 +177,4 @@ var (
 		"rem":    HandleRemCommand,
 		"avg":    HandleAverageCommand,
 	}
-
-	registeredCommands = make([]*discordgo.ApplicationCommand, len(commands))
 )
-
-func InitDiscordSession() {
-	var err error
-	s, err = discordgo.New("Bot " + *BotToken)
-	if err != nil {
-		log.Fatalf("Invalid bot parameters: %v", err)
-	}
-	s.AddHandler(onReady)
-	s.AddHandler(handleCommands)
-}
-
-func OpenDiscordSession() {
-	err := s.Open()
-	if err != nil {
-		log.Fatalf("Cannot open the session: %v", err)
-	}
-}
-
-func AddCommandsDiscord() {
-	log.Println("Adding commands...")
-	for i, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, *GuildID, v)
-		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
-		}
-		registeredCommands[i] = cmd
-	}
-}
-
-func RemoveCommandsDiscord() {
-	log.Println("Removing commands...")
-	for _, v := range registeredCommands {
-		err := s.ApplicationCommandDelete(s.State.User.ID, *GuildID, v.ID)
-		if err != nil {
-			log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
-		}
-	}
-}
-
-func onReady(s *discordgo.Session, r *discordgo.Ready) {
-	log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
-}
-
-func handleCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	switch i.Type {
-	case discordgo.InteractionApplicationCommand:
-		log.Printf("Handling slash command interaction %v", i.ApplicationCommandData().Name)
-		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i)
-		}
-
-	case discordgo.InteractionMessageComponent:
-		log.Printf("Handling component interaction %v", i.MessageComponentData().CustomID)
-		idPrefix := strings.Split(i.MessageComponentData().CustomID, "_")[0]
-		if h, ok := componentHandlers[idPrefix]; ok {
-			h(s, i)
-		}
-	}
-
-}
-
-func CreateInteractionResponse(content string, ephemeral bool, messageComponents []discordgo.MessageComponent) *discordgo.InteractionResponse {
-	interactionResponse := &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
-			/* Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{
-					Components: []discordgo.MessageComponent{
-						discordgo.Button{
-							Emoji: discordgo.ComponentEmoji{
-								Name: ":arrow_up:",
-							},
-							Label: "Increase Quantity",
-							Style: discordgo.SecondaryButton,
-							CustomID: "",
-						},
-						discordgo.Button{
-							Emoji: discordgo.ComponentEmoji{
-								Name: "🔧",
-							},
-							Label: "Discord developers",
-							Style: discordgo.LinkButton,
-							URL:   "https://discord.gg/discord-developers",
-						},
-						discordgo.Button{
-							Emoji: discordgo.ComponentEmoji{
-								Name: "🦫",
-							},
-							Label: "Discord Gophers",
-							Style: discordgo.LinkButton,
-							URL:   "https://discord.gg/7RuRrVHyXF",
-						},
-					},
-				},
-			}, */
-		},
-	}
-
-	if ephemeral {
-		// Message only shows for the user that triggered it
-		interactionResponse.Data.Flags = discordgo.MessageFlagsEphemeral
-	}
-
-	if len(messageComponents) > 0 {
-		interactionResponse.Data.Components = messageComponents
-	}
-
-	return interactionResponse
-}

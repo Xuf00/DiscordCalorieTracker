@@ -1,0 +1,156 @@
+package helper
+
+import (
+	"fmt"
+	"log"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/discordcalorietracker/database"
+	"github.com/discordcalorietracker/discord"
+)
+
+func ConvertOptionsToMap(i *discordgo.InteractionCreate) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+	// Access options in the order provided by the user.
+	options := i.ApplicationCommandData().Options
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+	return optionMap
+}
+
+func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, userId string, userDisplayName string, date time.Time, messageComponents []discordgo.MessageComponent, ephemeral bool) {
+	user, userErr := database.FetchUserByID(userId)
+	if userErr != nil {
+		log.Printf("Error fetching user with ID %v and username %v. Error: %v", userId, userDisplayName, userErr)
+		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse("Error fetching user, please try again...", true, nil))
+		return
+	}
+
+	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, date.Format("02/01/2006"))
+	foodLogs, foodLogErr := database.FetchDailyFoodLogs(userId, date)
+	if foodLogErr != nil {
+		log.Printf("Error fetching food logs for user %v: %v", userDisplayName, foodLogErr)
+		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse("Error fetching food logs, please try again...", true, nil))
+		return
+	}
+
+	if len(foodLogs) == 0 {
+		log.Printf("User %v has no logs on %v.", userDisplayName, date.Format("02/01/2006"))
+		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, date.Format("02/01/2006")), true, nil))
+		return
+	}
+
+	consumed, consumedErr := database.FetchConsumedCaloriesForDate(userId, date)
+	remaining, remainingErr := database.FetchRemainingCalories(userId, date)
+	if consumedErr != nil || remainingErr != nil {
+		log.Printf("Error fetching consumed or remaining calories for user %v.", userDisplayName)
+		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse("Error fetching consumed or remaining calories, please try again...", true, nil))
+		return
+	}
+
+	if !ephemeral {
+		updateBtn := discordgo.Button{
+			Emoji: discordgo.ComponentEmoji{
+				Name: "♻️",
+			},
+			Label:    "Update",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("fllist_%s_%s_%s", userId, userDisplayName, date.Format("02/01/2006")),
+		}
+
+		messageComponents = append(messageComponents, updateBtn)
+	}
+
+	embed := createFoodLogEmbed(userDisplayName, date, foodLogs, int64(user.DailyCalories), consumed, remaining)
+	interactionResponse := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{
+				embed,
+			},
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: messageComponents,
+				},
+			},
+		},
+	}
+
+	if ephemeral {
+		// Message only shows for the user that triggered it
+		interactionResponse.Data.Flags = discordgo.MessageFlagsEphemeral
+	}
+
+	s.InteractionRespond(i.Interaction, interactionResponse)
+}
+
+func createFoodLogEmbed(username string, date time.Time, foodLogs []database.FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
+	var foodItemNames strings.Builder
+	var calories strings.Builder
+	var times strings.Builder
+
+	for _, foodLog := range foodLogs {
+		totalCalories := foodLog.Calories
+		if foodLog.Quantity > 1 {
+			totalCalories = foodLog.Calories * foodLog.Quantity
+			foodItemNames.WriteString(fmt.Sprintf("(%d) x%d %s\n", foodLog.ID, foodLog.Quantity, foodLog.FoodItem))
+		} else {
+			foodItemNames.WriteString(fmt.Sprintf("(%d) %s\n", foodLog.ID, foodLog.FoodItem))
+		}
+		calories.WriteString(fmt.Sprintf("%d\n", totalCalories))
+		times.WriteString(fmt.Sprintf("%s\n", foodLog.DateTime.Format("15:04")))
+	}
+
+	now := time.Now()
+
+	embed := &discordgo.MessageEmbed{
+		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date.Format("02/01/2006")),
+		Author: &discordgo.MessageEmbedAuthor{},
+		Color:  0x89CFF0,
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name: "\u200b",
+			},
+			{
+				Name:   "Time",
+				Value:  times.String(),
+				Inline: true,
+			},
+			{
+				Name:   "Name",
+				Value:  foodItemNames.String(),
+				Inline: true,
+			},
+			{
+				Name:   "Calories",
+				Value:  calories.String(),
+				Inline: true,
+			},
+			{
+				Name: "\u200b",
+			},
+			{
+				Name:   "Daily",
+				Value:  strconv.FormatInt(daily, 10),
+				Inline: true,
+			},
+			{
+				Name:   "Remaining",
+				Value:  strconv.FormatInt(remaining, 10),
+				Inline: true,
+			},
+			{
+				Name:   "Total",
+				Value:  strconv.FormatInt(consumed, 10),
+				Inline: true,
+			},
+		},
+		Timestamp: now.Format(time.RFC3339),
+	}
+
+	return embed
+}

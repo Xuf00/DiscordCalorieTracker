@@ -5,6 +5,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+
+	"github.com/discordcalorietracker/command"
+	"github.com/discordcalorietracker/component"
+	"github.com/discordcalorietracker/database"
+	"github.com/discordcalorietracker/discord"
 )
 
 // Bot parameters
@@ -17,16 +22,16 @@ var (
 func main() {
 	flag.Parse()
 
-	InitDatabase()
+	database.InitDatabase()
 
-	InitDiscordSession()
+	discord.InitDiscordSession(*BotToken)
+	discord.OpenDiscordSession()
+	discord.InitDiscordCommands(command.CommandDefinitions, command.CommandHandlers)
+	discord.InitDiscordComponentHandlers(component.ComponentHandlers)
+	discord.AddCommandsDiscord(*GuildID)
 
-	OpenDiscordSession()
-
-	AddCommandsDiscord()
-
-	defer db.Close()
-	defer s.Close()
+	defer database.DB.Close()
+	defer discord.S.Close()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -34,7 +39,7 @@ func main() {
 	<-stop
 
 	if *RemoveCommands {
-		RemoveCommandsDiscord()
+		discord.RemoveCommandsDiscord(*GuildID)
 	}
 
 	log.Println("Gracefully shutting down.")
