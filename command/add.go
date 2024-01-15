@@ -76,6 +76,17 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		messageComponents = append(messageComponents, decreaseQuantityBtn)
 	}
 
+	deleteBtn := discordgo.Button{
+		Emoji: discordgo.ComponentEmoji{
+			Name: "🚮",
+		},
+		Label:    fmt.Sprintf("Delete %s", foodLog.FoodItem),
+		Style:    discordgo.DangerButton,
+		CustomID: fmt.Sprintf("fldel_%s_%d_%s", userId, id, foodLog.FoodItem),
+	}
+
+	messageComponents = append(messageComponents, deleteBtn)
+
 	log.Printf("Added food log %v for user %v and retrieved remaining calories.", id, userDisplayName)
 	helper.DisplayFoodLogEmbed(s, i, userId, userDisplayName, time.Now(), messageComponents, true)
 }

@@ -72,17 +72,20 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 			Embeds: []*discordgo.MessageEmbed{
 				embed,
 			},
-			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{
-					Components: messageComponents,
-				},
-			},
 		},
 	}
 
 	if ephemeral {
 		// Message only shows for the user that triggered it
 		interactionResponse.Data.Flags = discordgo.MessageFlagsEphemeral
+	}
+
+	if len(messageComponents) > 0 {
+		interactionResponse.Data.Components = []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: messageComponents,
+			},
+		}
 	}
 
 	s.InteractionRespond(i.Interaction, interactionResponse)

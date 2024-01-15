@@ -23,5 +23,5 @@ func HandleUpdateList(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	helper.DisplayFoodLogEmbed(s, i, userId, userDisplayName, date, nil, false)
+	helper.DisplayFoodLogEmbed(s, i, userId, userDisplayName, date, nil, true)
 }
