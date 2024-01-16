@@ -12,6 +12,8 @@ import (
 	"github.com/discordcalorietracker/discord"
 )
 
+const DATEFORMAT = "02/01/2006"
+
 func ConvertOptionsToMap(i *discordgo.InteractionCreate) map[string]*discordgo.ApplicationCommandInteractionDataOption {
 	// Access options in the order provided by the user.
 	options := i.ApplicationCommandData().Options
@@ -30,7 +32,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		return
 	}
 
-	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, date.Format("02/01/2006"))
+	log.Printf("Fetching food logs for user %v on date %v.", userDisplayName, date.Format(DATEFORMAT))
 	foodLogs, foodLogErr := database.FetchDailyFoodLogs(userId, date)
 	if foodLogErr != nil {
 		log.Printf("Error fetching food logs for user %v: %v", userDisplayName, foodLogErr)
@@ -39,8 +41,8 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	}
 
 	if len(foodLogs) == 0 {
-		log.Printf("User %v has no logs on %v.", userDisplayName, date.Format("02/01/2006"))
-		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, date.Format("02/01/2006")), true, nil))
+		log.Printf("User %v has no logs on %v.", userDisplayName, date.Format(DATEFORMAT))
+		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse(fmt.Sprintf("No logs found for %v on %v.", userDisplayName, date.Format(DATEFORMAT)), true, nil))
 		return
 	}
 
@@ -59,7 +61,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 			},
 			Label:    "Update",
 			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("fllist_%s_%s_%s", userId, userDisplayName, date.Format("02/01/2006")),
+			CustomID: fmt.Sprintf("fllist_%s_%s_%s", userId, userDisplayName, date.Format(DATEFORMAT)),
 		}
 
 		messageComponents = append(messageComponents, updateBtn)
@@ -111,7 +113,7 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []database.Foo
 	now := time.Now()
 
 	embed := &discordgo.MessageEmbed{
-		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date.Format("02/01/2006")),
+		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date.Format(DATEFORMAT)),
 		Author: &discordgo.MessageEmbedAuthor{},
 		Color:  0x89CFF0,
 		Fields: []*discordgo.MessageEmbedField{

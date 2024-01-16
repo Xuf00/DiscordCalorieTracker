@@ -34,7 +34,7 @@ func HandleAverageCommand(s *discordgo.Session, i *discordgo.InteractionCreate) 
 		return
 	}
 
-	startDate := time.Now().AddDate(0, 0, -int(days)).Format("2006-01-02")
+	startDate := time.Now().AddDate(0, 0, -int(days)).Format(helper.DATEFORMAT)
 	log.Printf("Fetching average calories for user %v. The start date is: %v.", userDisplayName, startDate)
 	averageCalories, averageCalErr := database.FetchAverageConsumedCalories(userId, startDate)
 	if averageCalErr != nil {

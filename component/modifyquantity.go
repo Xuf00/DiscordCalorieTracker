@@ -46,7 +46,7 @@ func HandleModifyFoodQuantity(s *discordgo.Session, i *discordgo.InteractionCrea
 			Emoji: discordgo.ComponentEmoji{
 				Name: "⬆️",
 			},
-			Label:    fmt.Sprintf("Add a %s", foodName),
+			Label:    fmt.Sprintf("Add %s", foodName),
 			Style:    discordgo.SecondaryButton,
 			CustomID: fmt.Sprintf("flquantity_inc_%s_%d_%s", userId, logId, foodName),
 		},
@@ -54,7 +54,7 @@ func HandleModifyFoodQuantity(s *discordgo.Session, i *discordgo.InteractionCrea
 			Emoji: discordgo.ComponentEmoji{
 				Name: "⬇️",
 			},
-			Label:    fmt.Sprintf("Remove a %s", foodName),
+			Label:    fmt.Sprintf("Remove %s", foodName),
 			Style:    discordgo.SecondaryButton,
 			CustomID: fmt.Sprintf("flquantity_dec_%s_%d_%s", userId, logId, foodName),
 		},

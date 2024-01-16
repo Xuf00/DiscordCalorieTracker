@@ -119,9 +119,9 @@ func UpdateFoodLogQuantity(userId string, logId int64, direction string) (int64,
 	var query string
 	switch direction {
 	case "inc":
-		query = `UPDATE food_log SET quantity=quantity+1 WHERE id=? AND user_id=?`
+		query = `UPDATE food_log SET quantity=quantity+1, date_time=CURRENT_TIMESTAMP WHERE id=? AND user_id=?`
 	case "dec":
-		query = `UPDATE food_log SET quantity=quantity-1 WHERE id=? AND user_id=? AND quantity > 1`
+		query = `UPDATE food_log SET quantity=quantity-1, date_time=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND quantity > 1`
 	default:
 		return 0, errors.New("invalid direction")
 	}
@@ -166,7 +166,7 @@ func FetchDailyFoodLogs(userId string, date time.Time) ([]FoodLog, error) {
 	var foodLogs []FoodLog
 	rows, err := DB.QueryContext(
 		context.Background(),
-		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time)=?`,
+		`SELECT * FROM food_log WHERE user_id=? AND DATE(date_time)=? ORDER BY date_time`,
 		userId, dateStr,
 	)
 	if err != nil && err != sql.ErrNoRows {

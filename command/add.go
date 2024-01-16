@@ -57,7 +57,7 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			Emoji: discordgo.ComponentEmoji{
 				Name: "⬆️",
 			},
-			Label:    fmt.Sprintf("Add a %s", foodLog.FoodItem),
+			Label:    fmt.Sprintf("Add %s", foodLog.FoodItem),
 			Style:    discordgo.SecondaryButton,
 			CustomID: fmt.Sprintf("flquantity_inc_%s_%d_%s", userId, id, foodLog.FoodItem),
 		},
@@ -68,7 +68,7 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			Emoji: discordgo.ComponentEmoji{
 				Name: "⬇️",
 			},
-			Label:    fmt.Sprintf("Remove a %s", foodLog.FoodItem),
+			Label:    fmt.Sprintf("Remove %s", foodLog.FoodItem),
 			Style:    discordgo.SecondaryButton,
 			CustomID: fmt.Sprintf("flquantity_dec_%s_%d_%s", userId, id, foodLog.FoodItem),
 		}

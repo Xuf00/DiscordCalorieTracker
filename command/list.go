@@ -38,7 +38,7 @@ func HandleListCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		date, dateParseErr := time.Parse("02/01/2006", dateCmd.StringValue())
 		if dateParseErr != nil {
 			log.Printf("Error parsing for user with username %v. Error: %v", userDisplayName, dateParseErr)
-			s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format like %v.", startDate.Format("02/01/2006")), true, nil))
+			s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse(fmt.Sprintf("Error parsing date, please try again with format like %v.", startDate.Format(helper.DATEFORMAT)), true, nil))
 			return
 		}
 		startDate = date
