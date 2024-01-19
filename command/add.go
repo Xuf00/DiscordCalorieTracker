@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -52,40 +51,7 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	messageComponents := []discordgo.MessageComponent{
-		discordgo.Button{
-			Emoji: discordgo.ComponentEmoji{
-				Name: "⬆️",
-			},
-			Label:    fmt.Sprintf("Add %s", foodLog.FoodItem),
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("flquantity_inc_%s_%d_%s", userId, id, foodLog.FoodItem),
-		},
-	}
-
-	if foodLog.Quantity > 1 {
-		decreaseQuantityBtn := discordgo.Button{
-			Emoji: discordgo.ComponentEmoji{
-				Name: "⬇️",
-			},
-			Label:    fmt.Sprintf("Remove %s", foodLog.FoodItem),
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("flquantity_dec_%s_%d_%s", userId, id, foodLog.FoodItem),
-		}
-
-		messageComponents = append(messageComponents, decreaseQuantityBtn)
-	}
-
-	deleteBtn := discordgo.Button{
-		Emoji: discordgo.ComponentEmoji{
-			Name: "🚮",
-		},
-		Label:    fmt.Sprintf("Delete %s", foodLog.FoodItem),
-		Style:    discordgo.DangerButton,
-		CustomID: fmt.Sprintf("fldel_%s_%d_%s", userId, id, foodLog.FoodItem),
-	}
-
-	messageComponents = append(messageComponents, deleteBtn)
+	messageComponents := helper.CreateAddRemoveUpdateButtons(userId, id, foodLog.FoodItem)
 
 	log.Printf("Added food log %v for user %v and retrieved remaining calories.", id, userDisplayName)
 	helper.DisplayFoodLogEmbed(s, i, userId, userDisplayName, time.Now(), messageComponents, true)

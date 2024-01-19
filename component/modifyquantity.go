@@ -41,32 +41,7 @@ func HandleModifyFoodQuantity(s *discordgo.Session, i *discordgo.InteractionCrea
 		return
 	}
 
-	messageComponents := []discordgo.MessageComponent{
-		discordgo.Button{
-			Emoji: discordgo.ComponentEmoji{
-				Name: "⬆️",
-			},
-			Label:    fmt.Sprintf("Add %s", foodName),
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("flquantity_inc_%s_%d_%s", userId, logId, foodName),
-		},
-		discordgo.Button{
-			Emoji: discordgo.ComponentEmoji{
-				Name: "⬇️",
-			},
-			Label:    fmt.Sprintf("Remove %s", foodName),
-			Style:    discordgo.SecondaryButton,
-			CustomID: fmt.Sprintf("flquantity_dec_%s_%d_%s", userId, logId, foodName),
-		},
-		discordgo.Button{
-			Emoji: discordgo.ComponentEmoji{
-				Name: "🚮",
-			},
-			Label:    fmt.Sprintf("Delete %s", foodName),
-			Style:    discordgo.DangerButton,
-			CustomID: fmt.Sprintf("fldel_%s_%d_%s", userId, logId, foodName),
-		},
-	}
+	messageComponents := helper.CreateAddRemoveUpdateButtons(userId, logId, foodName)
 
 	log.Printf("Updated the quantity for food log %v for user %v and retrieved remaining calories.", logId, userDisplayName)
 	helper.DisplayFoodLogEmbed(s, i, userId, userDisplayName, time.Now(), messageComponents, true)
