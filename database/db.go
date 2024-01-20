@@ -214,7 +214,7 @@ func FetchConsumedCaloriesForDate(userId string, date time.Time) (int64, error) 
 func FetchAverageConsumedCalories(userId string, date string) (int64, error) {
 	row := DB.QueryRowContext(
 		context.Background(),
-		`SELECT AVG(daily_sum) average_calories
+		`SELECT ROUND(AVG(daily_sum), 0) AS average_calories
 		FROM (
 			SELECT SUM(calories*quantity) daily_sum
 			FROM food_log 
