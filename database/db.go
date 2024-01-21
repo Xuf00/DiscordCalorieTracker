@@ -13,6 +13,8 @@ import (
 type User struct {
 	ID            string
 	DailyCalories int16
+	DayStreak     int16
+	LastLogged    time.Time
 }
 
 type FoodLog struct {
@@ -36,7 +38,9 @@ func InitDatabase() {
 		context.Background(),
 		`CREATE TABLE IF NOT EXISTS user (
 			id TEXT PRIMARY KEY,
-			daily_calories INTEGER NOT NULL
+			daily_calories INTEGER NOT NULL,
+			day_streak INTEGER NOT NULL DEFAULT 0,
+			last_logged DATE DEFAULT '2000-01-01'
 		);
 		CREATE TABLE IF NOT EXISTS food_log (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +66,7 @@ func FetchUserByID(id string) (User, error) {
 		`SELECT * FROM user WHERE id=?`, id,
 	)
 
-	err := row.Scan(&user.ID, &user.DailyCalories)
+	err := row.Scan(&user.ID, &user.DailyCalories, &user.DayStreak, &user.LastLogged)
 
 	if err != nil && err != sql.ErrNoRows {
 		return user, err
@@ -79,6 +83,24 @@ func SetUserCalories(user *User) (sql.Result, error) {
 		user.ID, user.DailyCalories,
 	)
 	return result, err
+}
+
+func UpdateUserStreak(userId string) (int64, error) {
+	result, err := DB.ExecContext(
+		context.Background(),
+		`UPDATE user SET day_streak = CASE WHEN last_logged = date('now', '-1 day') THEN day_streak + 1 ELSE 1 END, last_logged = CURRENT_DATE WHERE id = ?;`,
+		userId,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
 }
 
 func AddUserFoodLog(foodLog *FoodLog) (int64, error) {

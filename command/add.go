@@ -51,6 +51,19 @@ func HandleAddCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
+	lastLogged := user.LastLogged.Format(helper.DATEFORMAT)
+	currentDate := time.Now().Format(helper.DATEFORMAT)
+
+	if lastLogged != currentDate {
+		log.Printf("Updating the daily streak for user %v. They last logged on %v.", userDisplayName, lastLogged)
+		n, err := database.UpdateUserStreak(userId)
+		if n == 0 || err != nil {
+			log.Printf("Error updating daily streak for user %v. Error: %v", userDisplayName, err)
+			s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse("There was an error, please try again...", true, nil))
+			return
+		}
+	}
+
 	messageComponents := helper.CreateAddRemoveUpdateButtons(userId, id, foodLog.FoodItem)
 
 	log.Printf("Added food log %v for user %v and retrieved remaining calories.", id, userDisplayName)

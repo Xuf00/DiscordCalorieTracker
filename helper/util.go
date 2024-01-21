@@ -67,7 +67,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		messageComponents = append(messageComponents, updateBtn)
 	}
 
-	embed := createFoodLogEmbed(userDisplayName, date, foodLogs, int64(user.DailyCalories), consumed, remaining)
+	embed := createFoodLogEmbed(userDisplayName, int64(user.DayStreak), date, foodLogs, int64(user.DailyCalories), consumed, remaining)
 	interactionResponse := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -93,7 +93,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	s.InteractionRespond(i.Interaction, interactionResponse)
 }
 
-func createFoodLogEmbed(username string, date time.Time, foodLogs []database.FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
+func createFoodLogEmbed(username string, streak int64, date time.Time, foodLogs []database.FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
 	var foodItemNames strings.Builder
 	var calories strings.Builder
 	var times strings.Builder
@@ -155,6 +155,9 @@ func createFoodLogEmbed(username string, date time.Time, foodLogs []database.Foo
 			},
 		},
 		Timestamp: now.Format(time.RFC3339),
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: fmt.Sprintf("%v day streak", streak),
+		},
 	}
 
 	return embed
