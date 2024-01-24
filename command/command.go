@@ -39,10 +39,6 @@ var (
 			},
 		},
 		{
-			Name:        "rem",
-			Description: "Gives your remaining calories for the day",
-		},
-		{
 			Name:        "update",
 			Description: "Update a log entry",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -174,7 +170,6 @@ var (
 		"del":    HandleDeleteCommand,
 		"conv":   HandleConvCommand,
 		"list":   HandleListCommand,
-		"rem":    HandleRemCommand,
 		"avg":    HandleAverageCommand,
 	}
 )
