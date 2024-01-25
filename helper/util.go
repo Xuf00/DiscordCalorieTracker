@@ -3,7 +3,6 @@ package helper
 import (
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 
@@ -46,9 +45,14 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		return
 	}
 
+	daysSinceSunday := int(date.Weekday())
+	daysToSubtract := (daysSinceSunday + 6) % 7
+	previousSunday := date.AddDate(0, 0, -daysToSubtract)
+
 	consumed, consumedErr := database.FetchConsumedCaloriesForDate(userId, date)
 	remaining, remainingErr := database.FetchRemainingCalories(userId, date)
-	if consumedErr != nil || remainingErr != nil {
+	remainingWeek, remainingWeekErr := database.FetchWeeksRemainingCalories(userId, previousSunday, date)
+	if consumedErr != nil || remainingErr != nil || remainingWeekErr != nil {
 		log.Printf("Error fetching consumed or remaining calories for user %v.", userDisplayName)
 		s.InteractionRespond(i.Interaction, discord.CreateInteractionResponse("Error fetching consumed or remaining calories, please try again...", true, nil))
 		return
@@ -67,7 +71,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		messageComponents = append(messageComponents, updateBtn)
 	}
 
-	embed := createFoodLogEmbed(userDisplayName, int64(user.DayStreak), date, foodLogs, int64(user.DailyCalories), consumed, remaining)
+	embed := createFoodLogEmbed(userDisplayName, int64(user.DayStreak), date, foodLogs, int64(user.DailyCalories), consumed, remaining, remainingWeek)
 	interactionResponse := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -93,7 +97,7 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	s.InteractionRespond(i.Interaction, interactionResponse)
 }
 
-func createFoodLogEmbed(username string, streak int64, date time.Time, foodLogs []database.FoodLog, daily int64, consumed int64, remaining int64) *discordgo.MessageEmbed {
+func createFoodLogEmbed(username string, streak int64, date time.Time, foodLogs []database.FoodLog, daily int64, consumed int64, remaining int64, remainingWeek int64) *discordgo.MessageEmbed {
 	var foodItemNames strings.Builder
 	var calories strings.Builder
 	var times strings.Builder
@@ -112,13 +116,23 @@ func createFoodLogEmbed(username string, streak int64, date time.Time, foodLogs 
 
 	now := time.Now()
 
+	weeklyGoalStr := "Under"
+	if remainingWeek < 0 {
+		weeklyGoalStr = "Over"
+	}
+
+	stats := fmt.Sprintf("**Total Consumed**: %d\n**Remaining On Day**: %d\n**Calories %s Weekly Goal**: %d\n", consumed, remaining, weeklyGoalStr, remainingWeek)
+
 	embed := &discordgo.MessageEmbed{
 		Title:  fmt.Sprintf("Food Log - %s (%s)", username, date.Format(DATEFORMAT)),
 		Author: &discordgo.MessageEmbedAuthor{},
 		Color:  0x89CFF0,
 		Fields: []*discordgo.MessageEmbedField{
 			{
-				Name: "\u200b",
+				Value: fmt.Sprintf("**Daily Calories**: %d\n", daily),
+			},
+			{
+				Value: "\u200b",
 			},
 			{
 				Name:   "Time",
@@ -136,22 +150,10 @@ func createFoodLogEmbed(username string, streak int64, date time.Time, foodLogs 
 				Inline: true,
 			},
 			{
-				Name: "\u200b",
+				Value: "\u200b",
 			},
 			{
-				Name:   "Daily",
-				Value:  strconv.FormatInt(daily, 10),
-				Inline: true,
-			},
-			{
-				Name:   "Remaining",
-				Value:  strconv.FormatInt(remaining, 10),
-				Inline: true,
-			},
-			{
-				Name:   "Total",
-				Value:  strconv.FormatInt(consumed, 10),
-				Inline: true,
+				Value: stats,
 			},
 		},
 		Timestamp: now.Format(time.RFC3339),

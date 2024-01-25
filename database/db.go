@@ -288,6 +288,40 @@ func FetchRemainingCalories(userId string, date time.Time) (int64, error) {
 	return remainingCalories, nil
 }
 
+func FetchWeeksRemainingCalories(userId string, fromDate time.Time, toDate time.Time) (int64, error) {
+	fromDateStr := fromDate.Format("2006-01-02")
+	toDateStr := toDate.Format("2006-01-02")
+	row := DB.QueryRowContext(
+		context.Background(),
+		`SELECT SUM(totalcalsperday) as remaining_calories
+		FROM (
+			SELECT user.id,
+			   user.daily_calories - COALESCE(SUM(food_log.calories * food_log.quantity), 0) AS totalcalsperday,
+			   DATE(food_log.date_time) AS log_date
+			FROM user
+			LEFT JOIN food_log ON user.id = food_log.user_id
+			WHERE user.id = ?
+			AND DATE(date_time) BETWEEN ? AND ?
+			GROUP BY user.id, user.daily_calories, log_date
+		);`,
+		userId, fromDateStr, toDateStr,
+	)
+
+	var remainingCalories int64
+
+	err := row.Scan(&remainingCalories)
+
+	if err != nil && err == sql.ErrNoRows {
+		return 10000, err
+	}
+
+	if err != nil {
+		return remainingCalories, err
+	}
+
+	return remainingCalories, nil
+}
+
 func FetchFoodLogDaysCount(userId string) (int64, error) {
 	row := DB.QueryRowContext(
 		context.Background(),
