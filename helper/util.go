@@ -46,8 +46,9 @@ func DisplayFoodLogEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	}
 
 	daysSinceSunday := int(date.Weekday())
-	daysToSubtract := (daysSinceSunday + 6) % 7
-	previousSunday := date.AddDate(0, 0, -daysToSubtract)
+	previousSunday := date.AddDate(0, 0, -daysSinceSunday)
+
+	log.Printf("Previous Sunday was %v and searched for date is %v. Had to subtract %v days.", previousSunday.Format(DATEFORMAT), date.Format(DATEFORMAT), daysSinceSunday)
 
 	consumed, consumedErr := database.FetchConsumedCaloriesForDate(userId, date)
 	remaining, remainingErr := database.FetchRemainingCalories(userId, date)
